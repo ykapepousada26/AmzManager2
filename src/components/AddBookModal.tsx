@@ -55,21 +55,46 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
     setIsSearchingIsbn(true);
     setIsbnMessage('Consultando dados do livro na API Open Library / Amazon...');
 
+    const cleanIsbn = isbn.replace(/[^0-9X]/gi, '');
+
     try {
       const res = await fetch(`/api/books/isbn/${encodeURIComponent(isbn)}`);
-      const data = await res.json();
-
-      if (data.found) {
-        setTitle(data.title || title);
-        setAuthor(data.author || author);
-        setCoverUrl(data.coverUrl || coverUrl);
-        if (data.pageCount) setPageCount(data.pageCount);
-        setIsbnMessage('Livro localizado e dados preenchidos com sucesso!');
-      } else {
-        setIsbnMessage(data.message || 'ISBN não encontrado. Preencha os campos manualmente.');
+      if (res.ok) {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data.found) {
+            setTitle(data.title || title);
+            setAuthor(data.author || author);
+            setCoverUrl(data.coverUrl || coverUrl);
+            if (data.pageCount) setPageCount(data.pageCount);
+            setIsbnMessage('Livro localizado e dados preenchidos com sucesso!');
+            return;
+          }
+        }
       }
+      throw new Error('Proxy offline');
     } catch (e) {
-      setIsbnMessage('Erro ao buscar ISBN. Você pode preencher manualmente.');
+      // Fallback: call Open Library directly from client browser if static host (Netlify)
+      try {
+        const openLibRes = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${cleanIsbn}&format=json&jscmd=data`);
+        const data = await openLibRes.json();
+        const bookData = data[`ISBN:${cleanIsbn}`];
+
+        if (bookData) {
+          setTitle(bookData.title || title);
+          setAuthor(bookData.authors ? bookData.authors.map((a: any) => a.name).join(', ') : author);
+          if (bookData.cover?.large || bookData.cover?.medium) {
+            setCoverUrl(bookData.cover.large || bookData.cover.medium);
+          }
+          if (bookData.number_of_pages) setPageCount(bookData.number_of_pages);
+          setIsbnMessage('Livro localizado via OpenLibrary (Modo Direto)!');
+        } else {
+          setIsbnMessage('ISBN não encontrado na base pública. Preencha os campos manualmente.');
+        }
+      } catch (err) {
+        setIsbnMessage('Erro ao buscar ISBN. Você pode preencher manualmente.');
+      }
     } finally {
       setIsSearchingIsbn(false);
     }
