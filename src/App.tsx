@@ -56,6 +56,11 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Set document title
+  useEffect(() => {
+    document.title = 'Amz Manager- Controle de Vendas de Livros';
+  }, []);
+
   // Save to LocalStorage
   useEffect(() => {
     localStorage.setItem('amazon_books_catalog', JSON.stringify(books));
