@@ -285,6 +285,13 @@ export default function App() {
     showToast(`Venda registrada com sucesso em ${newSale.countryName}!`);
   };
 
+  const handleUpdateSale = (updatedSale: SaleOrder) => {
+    setSales((prev) =>
+      prev.map((s) => (s.id === updatedSale.id ? updatedSale : s))
+    );
+    showToast(`Informações do fornecedor salvas para o pedido ${updatedSale.amazonOrderId}!`);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-slate-950">
       {/* Toast Notification */}
@@ -361,6 +368,7 @@ export default function App() {
               displayCurrency={displayCurrency}
               onExportCsv={handleExportCsv}
               onAddSale={() => setIsAddSaleOpen(true)}
+              onUpdateSale={handleUpdateSale}
             />
           </div>
         )}
@@ -379,6 +387,7 @@ export default function App() {
               displayCurrency={displayCurrency}
               onExportCsv={handleExportCsv}
               onAddSale={() => setIsAddSaleOpen(true)}
+              onUpdateSale={handleUpdateSale}
             />
           </div>
         )}

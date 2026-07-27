@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SaleOrder, DisplayCurrency, CountryId } from '../types';
 import { AMAZON_MARKETPLACES } from '../data/marketplaces';
+import { SupplierDetailsModal } from './SupplierDetailsModal';
 import { 
   Search, 
   Filter, 
@@ -11,7 +12,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
-  RotateCcw
+  RotateCcw,
+  Truck,
+  Building2,
+  Edit3
 } from 'lucide-react';
 
 interface SalesTableProps {
@@ -19,6 +23,7 @@ interface SalesTableProps {
   displayCurrency: DisplayCurrency;
   onExportCsv: () => void;
   onAddSale: () => void;
+  onUpdateSale?: (updatedSale: SaleOrder) => void;
 }
 
 export const SalesTable: React.FC<SalesTableProps> = ({
@@ -26,12 +31,14 @@ export const SalesTable: React.FC<SalesTableProps> = ({
   displayCurrency,
   onExportCsv,
   onAddSale,
+  onUpdateSale,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFormat, setSelectedFormat] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('ALL'); // ALL, 1M, 3M, 6M, 12M
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedOrderForSupplier, setSelectedOrderForSupplier] = useState<SaleOrder | null>(null);
   const itemsPerPage = 10;
 
   const hasActiveFilters = searchQuery !== '' || selectedFormat !== 'ALL' || selectedStatus !== 'ALL' || selectedPeriod !== 'ALL';
@@ -294,17 +301,46 @@ export const SalesTable: React.FC<SalesTableProps> = ({
 
                     {/* Status */}
                     <td className="py-3 px-4 text-center whitespace-nowrap">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          order.status === 'Concluído'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                            : order.status === 'Pendente'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                            : 'bg-red-500/10 text-red-400 border border-red-500/30'
-                        }`}
-                      >
-                        {order.status}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (order.status === 'Concluído') {
+                              setSelectedOrderForSupplier(order);
+                            }
+                          }}
+                          disabled={order.status !== 'Concluído'}
+                          title={
+                            order.status === 'Concluído'
+                              ? 'Clique para preencher/editar fornecedor, preço do produto e custo de envio'
+                              : 'Disponível para vendas com status Concluído'
+                          }
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1 transition-all ${
+                            order.status === 'Concluído'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 hover:scale-105 cursor-pointer ring-offset-slate-900 focus:outline-none'
+                              : order.status === 'Pendente'
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 cursor-default'
+                              : 'bg-red-500/10 text-red-400 border border-red-500/30 cursor-default'
+                          }`}
+                        >
+                          <span>{order.status}</span>
+                          {order.status === 'Concluído' && (
+                            <Edit3 className="w-2.5 h-2.5 text-emerald-400 opacity-80" />
+                          )}
+                        </button>
+
+                        {/* Display Supplier Info if present */}
+                        {order.supplier && (
+                          <div
+                            onClick={() => setSelectedOrderForSupplier(order)}
+                            className="cursor-pointer text-[9px] bg-slate-950/80 border border-slate-800 text-slate-300 rounded px-1.5 py-0.5 max-w-[120px] truncate hover:border-amber-500/50 flex items-center space-x-1"
+                            title={`Fornecedor: ${order.supplier} | Custo Prod: ${order.currencySymbol} ${order.productCost || 0} | Envio: ${order.currencySymbol} ${order.shippingCost || 0}`}
+                          >
+                            <Building2 className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                            <span className="truncate">{order.supplier}</span>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -341,6 +377,19 @@ export const SalesTable: React.FC<SalesTableProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Supplier & Costs Modal */}
+      <SupplierDetailsModal
+        isOpen={selectedOrderForSupplier !== null}
+        onClose={() => setSelectedOrderForSupplier(null)}
+        order={selectedOrderForSupplier}
+        onSaveSupplierDetails={(updatedSale) => {
+          if (onUpdateSale) {
+            onUpdateSale(updatedSale);
+          }
+          setSelectedOrderForSupplier(null);
+        }}
+      />
     </div>
   );
 };
