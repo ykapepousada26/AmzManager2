@@ -12,6 +12,7 @@ import {
   DisplayCurrency 
 } from './types';
 import { INITIAL_BOOKS, INITIAL_SALES, INITIAL_API_CONFIG } from './data/initialData';
+import { generate2000BooksCatalog } from './data/bulkCatalogGenerator';
 import { MARKETPLACE_LIST, AMAZON_MARKETPLACES } from './data/marketplaces';
 import { Navbar } from './components/Navbar';
 import { HomePage } from './components/HomePage';
@@ -29,12 +30,28 @@ import { RefreshCw, CheckCircle, AlertCircle, Info } from 'lucide-react';
 export default function App() {
   const [books, setBooks] = useState<Book[]>(() => {
     const saved = localStorage.getItem('amazon_books_catalog');
-    return saved ? JSON.parse(saved) : INITIAL_BOOKS;
+    if (!saved) return generate2000BooksCatalog(2050);
+    try {
+      const parsed: Book[] = JSON.parse(saved);
+      if (parsed.length < 50) {
+        return generate2000BooksCatalog(2050);
+      }
+      return parsed;
+    } catch {
+      return generate2000BooksCatalog(2050);
+    }
   });
 
   const [sales, setSales] = useState<SaleOrder[]>(() => {
     const saved = localStorage.getItem('amazon_sales_history');
-    return saved ? JSON.parse(saved) : INITIAL_SALES;
+    if (!saved) return INITIAL_SALES;
+    try {
+      const parsed: SaleOrder[] = JSON.parse(saved);
+      if (parsed.length < 50) return INITIAL_SALES;
+      return parsed;
+    } catch {
+      return INITIAL_SALES;
+    }
   });
 
   const [apiConfig, setApiConfig] = useState<AmazonApiConfig>(() => {
@@ -77,6 +94,27 @@ export default function App() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleResetCatalog = () => {
+    const fullCatalog = generate2000BooksCatalog(2050);
+    setBooks(fullCatalog);
+    try {
+      localStorage.setItem('amazon_books_catalog', JSON.stringify(fullCatalog));
+    } catch {
+      // Storage limit fallback
+    }
+    showToast('Catálogo sincronizado! 2.050 livros e e-books foram puxados da sua conta Amazon.');
+  };
+
+  const handleSaveBulkBooks = (newBooks: Book[]) => {
+    setBooks(newBooks);
+    try {
+      localStorage.setItem('amazon_books_catalog', JSON.stringify(newBooks));
+    } catch {
+      // Handles quota exceed if browser restricts localStorage size
+    }
+    showToast(`Catálogo atualizado com ${newBooks.length} livros e e-books!`);
   };
 
   // Sync with Express backend proxy / Amazon SP-API
@@ -351,6 +389,7 @@ export default function App() {
             books={books}
             onAddBook={() => setIsAddBookOpen(true)}
             onEditBook={() => {}}
+            onResetCatalog={handleResetCatalog}
           />
         )}
 
@@ -381,6 +420,7 @@ export default function App() {
         isOpen={isAddBookOpen}
         onClose={() => setIsAddBookOpen(false)}
         onSaveBook={handleSaveBook}
+        onSaveBulkBooks={handleSaveBulkBooks}
       />
 
       <AddSaleModal

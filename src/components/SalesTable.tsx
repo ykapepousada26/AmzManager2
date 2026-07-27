@@ -9,7 +9,9 @@ import {
   ShoppingBag, 
   ExternalLink,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Calendar,
+  RotateCcw
 } from 'lucide-react';
 
 interface SalesTableProps {
@@ -28,10 +30,23 @@ export const SalesTable: React.FC<SalesTableProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFormat, setSelectedFormat] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('ALL'); // ALL, 1M, 3M, 6M, 12M
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  const hasActiveFilters = searchQuery !== '' || selectedFormat !== 'ALL' || selectedStatus !== 'ALL' || selectedPeriod !== 'ALL';
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedFormat('ALL');
+    setSelectedStatus('ALL');
+    setSelectedPeriod('ALL');
+    setCurrentPage(1);
+  };
+
   // Filter logic
+  const now = new Date();
+
   const filteredSales = sales.filter((order) => {
     const matchesSearch =
       order.bookTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -41,7 +56,17 @@ export const SalesTable: React.FC<SalesTableProps> = ({
     const matchesFormat = selectedFormat === 'ALL' || order.format === selectedFormat;
     const matchesStatus = selectedStatus === 'ALL' || order.status === selectedStatus;
 
-    return matchesSearch && matchesFormat && matchesStatus;
+    let matchesPeriod = true;
+    if (selectedPeriod !== 'ALL') {
+      const orderDate = new Date(order.date);
+      const diffDays = (now.getTime() - orderDate.getTime()) / (1000 * 3600 * 24);
+      if (selectedPeriod === '1M') matchesPeriod = diffDays <= 30;
+      else if (selectedPeriod === '3M') matchesPeriod = diffDays <= 90;
+      else if (selectedPeriod === '6M') matchesPeriod = diffDays <= 180;
+      else if (selectedPeriod === '12M') matchesPeriod = diffDays <= 365;
+    }
+
+    return matchesSearch && matchesFormat && matchesStatus && matchesPeriod;
   });
 
   const totalPages = Math.ceil(filteredSales.length / itemsPerPage) || 1;
@@ -123,7 +148,26 @@ export const SalesTable: React.FC<SalesTableProps> = ({
         </div>
 
         {/* Dropdown Filters */}
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {/* Period Filter */}
+          <div className="flex items-center space-x-1 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-amber-400">
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <select
+              value={selectedPeriod}
+              onChange={(e) => {
+                setSelectedPeriod(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-transparent text-xs text-slate-200 font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value="ALL" className="bg-slate-900 text-slate-200">Todo o Período</option>
+              <option value="1M" className="bg-slate-900 text-slate-200">Último Mês (30 dias)</option>
+              <option value="3M" className="bg-slate-900 text-slate-200">Últimos 3 Meses (90 dias)</option>
+              <option value="6M" className="bg-slate-900 text-slate-200">Últimos 6 Meses (180 dias)</option>
+              <option value="12M" className="bg-slate-900 text-slate-200">Últimos 12 Meses (365 dias)</option>
+            </select>
+          </div>
+
           {/* Format */}
           <select
             value={selectedFormat}
@@ -154,6 +198,21 @@ export const SalesTable: React.FC<SalesTableProps> = ({
             <option value="Pendente">Pendente</option>
             <option value="Reembolsado">Reembolsado</option>
           </select>
+
+          {/* Refresh / Reset Filters Button */}
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            title="Limpar e atualizar todos os filtros de busca e período"
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 border ${
+              hasActiveFilters
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 hover:bg-amber-500/30'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+            }`}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Atualizar Filtros</span>
+          </button>
         </div>
       </div>
 

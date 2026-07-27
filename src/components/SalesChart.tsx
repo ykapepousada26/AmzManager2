@@ -16,7 +16,7 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
-import { BarChart2, PieChart as PieChartIcon, TrendingUp, Globe } from 'lucide-react';
+import { BarChart2, PieChart as PieChartIcon, TrendingUp, Globe, Calendar } from 'lucide-react';
 
 interface SalesChartProps {
   sales: SaleOrder[];
@@ -25,6 +25,19 @@ interface SalesChartProps {
 
 export const SalesChart: React.FC<SalesChartProps> = ({ sales, displayCurrency }) => {
   const [chartType, setChartType] = useState<'country' | 'trend' | 'format'>('country');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('ALL'); // ALL, 1M, 3M, 6M, 12M
+
+  const now = new Date();
+  const filteredSales = sales.filter((order) => {
+    if (selectedPeriod === 'ALL') return true;
+    const orderDate = new Date(order.date);
+    const diffDays = (now.getTime() - orderDate.getTime()) / (1000 * 3600 * 24);
+    if (selectedPeriod === '1M') return diffDays <= 30;
+    if (selectedPeriod === '3M') return diffDays <= 90;
+    if (selectedPeriod === '6M') return diffDays <= 180;
+    if (selectedPeriod === '12M') return diffDays <= 365;
+    return true;
+  });
 
   const getCurrencySymbol = () => {
     if (displayCurrency === 'BRL') return 'R$';
@@ -44,7 +57,7 @@ export const SalesChart: React.FC<SalesChartProps> = ({ sales, displayCurrency }
   // 1. Data by Country
   const countryDataMap: Record<string, { country: string; flag: string; royalty: number; units: number }> = {};
 
-  sales.forEach((order) => {
+  filteredSales.forEach((order) => {
     const mkt = AMAZON_MARKETPLACES[order.countryId];
     const key = order.countryId;
     if (!countryDataMap[key]) {
@@ -69,7 +82,7 @@ export const SalesChart: React.FC<SalesChartProps> = ({ sales, displayCurrency }
 
   // 2. Data by Date Trend
   const dateDataMap: Record<string, { date: string; royalty: number; units: number }> = {};
-  sales.forEach((order) => {
+  filteredSales.forEach((order) => {
     const d = order.date;
     if (!dateDataMap[d]) {
       dateDataMap[d] = { date: d, royalty: 0, units: 0 };
@@ -88,7 +101,7 @@ export const SalesChart: React.FC<SalesChartProps> = ({ sales, displayCurrency }
 
   // 3. Data by Format
   const formatDataMap: Record<string, { name: string; royalty: number; units: number }> = {};
-  sales.forEach((order) => {
+  filteredSales.forEach((order) => {
     const fmt = order.format || 'Ebook';
     if (!formatDataMap[fmt]) {
       formatDataMap[fmt] = { name: fmt, royalty: 0, units: 0 };
@@ -107,52 +120,70 @@ export const SalesChart: React.FC<SalesChartProps> = ({ sales, displayCurrency }
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg mb-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-800">
         <div>
           <h3 className="text-sm md:text-base font-bold text-slate-100 flex items-center space-x-2">
             <BarChart2 className="w-5 h-5 text-amber-400" />
             <span>Análise Gráfica de Desempenho Global</span>
           </h3>
           <p className="text-xs text-slate-400">
-            Royalties e vendas por país, formato de livro e linha do tempo.
+            Royalties e vendas por país, formato de livro e linha do tempo ({filteredSales.length} pedidos).
           </p>
         </div>
 
-        {/* Toggle Chart View */}
-        <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-          <button
-            onClick={() => setChartType('country')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
-              chartType === 'country'
-                ? 'bg-amber-500 text-slate-950 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>Por País</span>
-          </button>
-          <button
-            onClick={() => setChartType('trend')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
-              chartType === 'trend'
-                ? 'bg-amber-500 text-slate-950 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>Evolução</span>
-          </button>
-          <button
-            onClick={() => setChartType('format')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
-              chartType === 'format'
-                ? 'bg-amber-500 text-slate-950 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <PieChartIcon className="w-3.5 h-3.5" />
-            <span>Por Formato</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Period Filter Dropdown */}
+          <div className="flex items-center space-x-1.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs text-amber-400">
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <select
+              value={selectedPeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value)}
+              className="bg-transparent text-xs font-bold text-slate-200 focus:outline-none cursor-pointer"
+            >
+              <option value="ALL" className="bg-slate-900 text-slate-200">Todo o Período</option>
+              <option value="1M" className="bg-slate-900 text-slate-200">Último Mês (30 dias)</option>
+              <option value="3M" className="bg-slate-900 text-slate-200">Últimos 3 Meses (90 dias)</option>
+              <option value="6M" className="bg-slate-900 text-slate-200">Últimos 6 Meses (180 dias)</option>
+              <option value="12M" className="bg-slate-900 text-slate-200">Últimos 12 Meses (365 dias)</option>
+            </select>
+          </div>
+
+          {/* Toggle Chart View */}
+          <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+            <button
+              onClick={() => setChartType('country')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                chartType === 'country'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>Por País</span>
+            </button>
+            <button
+              onClick={() => setChartType('trend')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                chartType === 'trend'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Evolução</span>
+            </button>
+            <button
+              onClick={() => setChartType('format')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                chartType === 'format'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <PieChartIcon className="w-3.5 h-3.5" />
+              <span>Por Formato</span>
+            </button>
+          </div>
         </div>
       </div>
 
