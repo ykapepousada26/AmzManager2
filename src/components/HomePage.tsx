@@ -35,6 +35,7 @@ interface HomePageProps {
   onOpenAddBook: () => void;
   onOpenAddSale: () => void;
   onOpenConfig: () => void;
+  onOpenCsvImport?: () => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
@@ -51,6 +52,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenAddBook,
   onOpenAddSale,
   onOpenConfig,
+  onOpenCsvImport,
 }) => {
   // Calculate quick metrics for summary cards
   const totalUnits = sales.reduce((acc, curr) => acc + curr.units, 0);

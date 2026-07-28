@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Book, CountryId } from '../types';
 import { MARKETPLACE_LIST, AMAZON_MARKETPLACES } from '../data/marketplaces';
-import { BookOpen, Plus, Search, ExternalLink, Sparkles, Globe, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, Plus, Search, ExternalLink, Sparkles, Globe, DollarSign, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 
 interface BooksCatalogProps {
   books: Book[];
   onAddBook: () => void;
   onEditBook?: (book: Book) => void;
   onResetCatalog?: () => void;
+  onOpenCsvImport?: () => void;
 }
 
 export const BooksCatalog: React.FC<BooksCatalogProps> = ({
@@ -15,6 +16,7 @@ export const BooksCatalog: React.FC<BooksCatalogProps> = ({
   onAddBook,
   onEditBook,
   onResetCatalog,
+  onOpenCsvImport,
 }) => {
   const [selectedBook, setSelectedBook] = useState<Book | null>(books[0] || null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,14 +65,13 @@ export const BooksCatalog: React.FC<BooksCatalogProps> = ({
         </div>
 
         <div className="flex items-center space-x-2 self-start sm:self-auto">
-          {onResetCatalog && (
+          {onOpenCsvImport && (
             <button
-              onClick={onResetCatalog}
-              title="Restaurar catálogo completo com todos os títulos"
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold rounded-xl text-xs transition-all flex items-center space-x-1.5"
+              onClick={onOpenCsvImport}
+              className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-semibold rounded-xl text-xs transition-all flex items-center space-x-1.5"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Sincronizar Catálogo ({books.length})</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Importar CSV KDP</span>
             </button>
           )}
 
@@ -79,7 +80,7 @@ export const BooksCatalog: React.FC<BooksCatalogProps> = ({
             className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all flex items-center space-x-1.5 shadow-md"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Cadastrar Novo Livro (ISBN)</span>
+            <span>Cadastrar Novo Livro</span>
           </button>
         </div>
       </div>
@@ -131,7 +132,35 @@ export const BooksCatalog: React.FC<BooksCatalogProps> = ({
           </div>
 
           <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
-            {paginatedBooks.length === 0 ? (
+            {books.length === 0 ? (
+              <div className="text-center py-10 bg-slate-950/60 rounded-xl border border-slate-800 text-slate-400 text-xs space-y-3 px-4">
+                <BookOpen className="w-8 h-8 text-amber-400 mx-auto opacity-70" />
+                <p className="font-bold text-slate-200 text-sm">Nenhum livro no catálogo</p>
+                <p className="text-slate-400 text-xs max-w-xs mx-auto">
+                  Cadastre suas obras reais ou importe seu relatório mensal de vendas do Amazon KDP (CSV).
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={onAddBook}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all inline-flex items-center space-x-1.5 shadow-md"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                    <span>Cadastrar Novo Livro</span>
+                  </button>
+                  {onOpenCsvImport && (
+                    <button
+                      type="button"
+                      onClick={onOpenCsvImport}
+                      className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold rounded-xl text-xs transition-all inline-flex items-center space-x-1.5"
+                    >
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                      <span>Importar CSV KDP</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : paginatedBooks.length === 0 ? (
               <div className="text-center py-8 bg-slate-950/40 rounded-xl border border-slate-800 text-slate-400 text-xs">
                 Nenhum livro encontrado com os filtros atuais.
               </div>

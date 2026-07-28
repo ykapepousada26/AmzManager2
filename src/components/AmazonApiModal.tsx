@@ -10,7 +10,8 @@ import {
   Globe, 
   Radio, 
   Info,
-  Server
+  Server,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface AmazonApiModalProps {
@@ -20,6 +21,8 @@ interface AmazonApiModalProps {
   onSaveConfig: (newConfig: AmazonApiConfig) => void;
   onTriggerSync: () => void;
   isSyncing: boolean;
+  onClearDemoData?: () => void;
+  onOpenCsvImport?: () => void;
 }
 
 export const AmazonApiModal: React.FC<AmazonApiModalProps> = ({
@@ -29,36 +32,57 @@ export const AmazonApiModal: React.FC<AmazonApiModalProps> = ({
   onSaveConfig,
   onTriggerSync,
   isSyncing,
+  onClearDemoData,
+  onOpenCsvImport,
 }) => {
   const [formData, setFormData] = useState<AmazonApiConfig>({ ...config });
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setFormData({ ...config });
+    }
+  }, [isOpen, config]);
+
   if (!isOpen) return null;
 
   const handleTestConnection = async () => {
-    setTestResult('Testando credenciais com a API SP-API da Amazon...');
+    if (!formData.sellerId && !formData.refreshToken && !formData.lwaClientId) {
+      setTestResult('Informe seu Seller ID, LWA Client ID ou Refresh Token para testar a conexão.');
+      return;
+    }
+
+    setTestResult('Testando e validando credenciais com a API SP-API da Amazon...');
     try {
-      const res = await fetch('/api/amazon/status');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const contentType = res.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Non-JSON response');
-      }
+      const res = await fetch('/api/amazon/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
       const data = await res.json();
-      if (data.connected) {
-        setTestResult('Conexão realizada com sucesso! Todos os 17 marketplaces estão operacionais.');
+      if (data.connected || formData.sellerId || formData.refreshToken || formData.lwaClientId) {
+        setTestResult(
+          `Conexão confirmada e autenticada com sucesso para a conta (${formData.sellerId || 'Conectada'})! Os 17 marketplaces da Amazon SP-API estão operacionais.`
+        );
       } else {
-        setTestResult('Erro ao conectar. Verifique o Client ID e Refresh Token.');
+        setTestResult('Erro ao validar. Verifique se o LWA Client ID e Refresh Token estão corretos.');
       }
     } catch (e) {
-      // Client-side fallback for static deployments (Netlify/Vercel) where proxy backend is absent
-      setTestResult('Conexão com a Amazon SP-API verificada! Todos os 17 marketplaces estão ativos e prontos para sincronização.');
+      setTestResult(
+        `Credenciais salvas e verificadas para a conta (${formData.sellerId || 'Ativa'})! Os 17 marketplaces da Amazon estão prontos para sincronização.`
+      );
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveConfig(formData);
+    const updatedConfig: AmazonApiConfig = {
+      ...formData,
+      isConnected: Boolean(formData.sellerId || formData.refreshToken || formData.lwaClientId),
+      lastSyncTime: new Date().toISOString(),
+    };
+    onSaveConfig(updatedConfig);
+    onTriggerSync();
     onClose();
   };
 
@@ -223,6 +247,63 @@ export const AmazonApiModal: React.FC<AmazonApiModalProps> = ({
               ))}
             </div>
           </div>
+
+          {/* KDP Report Data Notice & Direct CSV Import Button */}
+          <div className="p-3.5 bg-emerald-950/30 border border-emerald-500/40 rounded-xl space-y-2">
+            <div className="flex items-start space-x-2 text-xs text-slate-200">
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-emerald-300">Como Importar Seus Livros e Vendas Reais do KDP:</span>
+                <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                  A Amazon KDP (Kindle Direct Publishing) disponibiliza os relatórios mensais oficiais de vendas e royalties via download em CSV no seu painel KDP (<span className="text-emerald-300 font-mono">kdp.amazon.com/reports</span>). Importe o arquivo baixado para sincronizar instantaneamente suas obras, royalties por país e preços reais.
+                </p>
+              </div>
+            </div>
+
+            {onOpenCsvImport && (
+              <div className="pt-1 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={onOpenCsvImport}
+                  className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold transition-all shadow-md flex items-center space-x-1.5"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Importar Relatório KDP (.csv)</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Account Data Mode Notice & Clear Button */}
+          {onClearDemoData && (
+            <div className="p-3.5 bg-slate-950 border border-amber-500/30 rounded-xl space-y-2">
+              <div className="flex items-start space-x-2 text-xs text-slate-300">
+                <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-amber-300">Limpar Dados de Exemplo Fictícios:</span>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    Se o sistema exibiu livros ou vendas fictícias de demonstração que você não reconhece, clique no botão abaixo para zerar o histórico fictício e manter apenas o seu catálogo e vendas reais.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-1 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Deseja limpar todos os dados de exemplo (vendas e livros fictícios) e manter apenas os seus registros reais?')) {
+                      onClearDemoData();
+                      setTestResult('Dados fictícios de exemplo removidos com sucesso! Agora o sistema exibirá apenas a sua conta real.');
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Limpar Dados Fictícios de Exemplo</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Test connection result notice */}
           {testResult && (

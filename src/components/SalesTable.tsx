@@ -15,7 +15,8 @@ import {
   RotateCcw,
   Truck,
   Building2,
-  Edit3
+  Edit3,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface SalesTableProps {
@@ -24,6 +25,7 @@ interface SalesTableProps {
   onExportCsv: () => void;
   onAddSale: () => void;
   onUpdateSale?: (updatedSale: SaleOrder) => void;
+  onOpenCsvImport?: () => void;
 }
 
 export const SalesTable: React.FC<SalesTableProps> = ({
@@ -32,6 +34,7 @@ export const SalesTable: React.FC<SalesTableProps> = ({
   onExportCsv,
   onAddSale,
   onUpdateSale,
+  onOpenCsvImport,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFormat, setSelectedFormat] = useState<string>('ALL');
@@ -121,6 +124,15 @@ export const SalesTable: React.FC<SalesTableProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onOpenCsvImport && (
+            <button
+              onClick={onOpenCsvImport}
+              className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-semibold rounded-lg text-xs transition-all flex items-center space-x-1.5"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Importar CSV KDP</span>
+            </button>
+          )}
           <button
             onClick={onAddSale}
             className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition-all shadow-sm flex items-center space-x-1"
@@ -241,7 +253,37 @@ export const SalesTable: React.FC<SalesTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
-            {paginatedSales.length === 0 ? (
+            {sales.length === 0 ? (
+              <tr>
+                <td colSpan={10} className="text-center py-12 text-slate-400">
+                  <div className="space-y-3 max-w-sm mx-auto">
+                    <p className="font-bold text-slate-200 text-sm">Nenhum pedido registrado</p>
+                    <p className="text-xs text-slate-400">
+                      Importe seu relatório de vendas em formato CSV do Amazon KDP ou lance uma venda individual manualmente.
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                      {onOpenCsvImport && (
+                        <button
+                          type="button"
+                          onClick={onOpenCsvImport}
+                          className="px-3.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all inline-flex items-center space-x-1.5"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Importar CSV KDP</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={onAddSale}
+                        className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition-all shadow-md"
+                      >
+                        Lançar Venda
+                      </button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            ) : paginatedSales.length === 0 ? (
               <tr>
                 <td colSpan={10} className="text-center py-12 text-slate-500">
                   Nenhum pedido encontrado com os filtros aplicados.
@@ -299,46 +341,44 @@ export const SalesTable: React.FC<SalesTableProps> = ({
                       {getFormattedMoney(order, true)}
                     </td>
 
-                    {/* Status */}
+                    {/* Status & Custos */}
                     <td className="py-3 px-4 text-center whitespace-nowrap">
-                      <div className="flex flex-col items-center gap-1">
+                      <div className="flex flex-col items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => {
-                            if (order.status === 'Concluído') {
-                              setSelectedOrderForSupplier(order);
-                            }
-                          }}
-                          disabled={order.status !== 'Concluído'}
-                          title={
+                          onClick={() => setSelectedOrderForSupplier(order)}
+                          title="Clique para preencher/editar fornecedor, preço do produto e custo de envio"
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center space-x-1.5 transition-all hover:scale-105 cursor-pointer focus:outline-none ${
                             order.status === 'Concluído'
-                              ? 'Clique para preencher/editar fornecedor, preço do produto e custo de envio'
-                              : 'Disponível para vendas com status Concluído'
-                          }
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1 transition-all ${
-                            order.status === 'Concluído'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 hover:scale-105 cursor-pointer ring-offset-slate-900 focus:outline-none'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20'
                               : order.status === 'Pendente'
-                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 cursor-default'
-                              : 'bg-red-500/10 text-red-400 border border-red-500/30 cursor-default'
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20'
+                              : 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20'
                           }`}
                         >
                           <span>{order.status}</span>
-                          {order.status === 'Concluído' && (
-                            <Edit3 className="w-2.5 h-2.5 text-emerald-400 opacity-80" />
-                          )}
+                          <Edit3 className="w-3 h-3 text-emerald-400 opacity-90" />
                         </button>
 
-                        {/* Display Supplier Info if present */}
-                        {order.supplier && (
+                        {/* Display Supplier Info if present or button to add */}
+                        {order.supplier ? (
                           <div
                             onClick={() => setSelectedOrderForSupplier(order)}
-                            className="cursor-pointer text-[9px] bg-slate-950/80 border border-slate-800 text-slate-300 rounded px-1.5 py-0.5 max-w-[120px] truncate hover:border-amber-500/50 flex items-center space-x-1"
+                            className="cursor-pointer text-[9px] bg-slate-950/90 border border-amber-500/30 text-amber-300 rounded px-2 py-0.5 max-w-[130px] truncate hover:border-amber-400 flex items-center space-x-1 transition-colors"
                             title={`Fornecedor: ${order.supplier} | Custo Prod: ${order.currencySymbol} ${order.productCost || 0} | Envio: ${order.currencySymbol} ${order.shippingCost || 0}`}
                           >
                             <Building2 className="w-2.5 h-2.5 text-amber-400 shrink-0" />
                             <span className="truncate">{order.supplier}</span>
                           </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderForSupplier(order)}
+                            className="text-[9px] text-slate-400 hover:text-amber-400 underline decoration-slate-600 hover:decoration-amber-400 transition-all flex items-center space-x-1"
+                          >
+                            <Building2 className="w-2.5 h-2.5 text-slate-500" />
+                            <span>+ Add Fornecedor</span>
+                          </button>
                         )}
                       </div>
                     </td>

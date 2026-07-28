@@ -18,6 +18,7 @@ interface NavbarProps {
   onOpenConfig: () => void;
   onOpenAddBook: () => void;
   onOpenAddSale: () => void;
+  onOpenCsvImport?: () => void;
   onSync: () => void;
   isSyncing: boolean;
   displayCurrency: DisplayCurrency;
@@ -32,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenConfig,
   onOpenAddBook,
   onOpenAddSale,
+  onOpenCsvImport,
   onSync,
   isSyncing,
   displayCurrency,
@@ -179,6 +181,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 € EUR
               </button>
             </div>
+
+            {/* Import KDP Report Button */}
+            {onOpenCsvImport && (
+              <button
+                onClick={onOpenCsvImport}
+                className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold transition-all"
+                title="Importar Relatório de Vendas KDP (CSV)"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400 rotate-180" />
+                <span>Importar CSV KDP</span>
+              </button>
+            )}
 
             {/* Sync Button */}
             <button

@@ -83,10 +83,13 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
           {formatMoney(totalGross)}
         </div>
         <div className="flex items-center text-[11px] text-slate-400 mt-2">
-          <span className="text-emerald-400 font-bold flex items-center mr-1">
-            <TrendingUp className="w-3 h-3 mr-0.5" /> +14.2%
-          </span>
-          vs período anterior
+          {totalGross > 0 ? (
+            <span className="text-emerald-400 font-bold flex items-center mr-1">
+              <TrendingUp className="w-3 h-3 mr-0.5" /> Receita Ativa
+            </span>
+          ) : (
+            <span className="text-slate-500 font-medium">Nenhuma venda registrada</span>
+          )}
         </div>
       </div>
 

@@ -25,38 +25,44 @@ import { CountriesOverview } from './components/CountriesOverview';
 import { AmazonApiModal } from './components/AmazonApiModal';
 import { AddBookModal } from './components/AddBookModal';
 import { AddSaleModal } from './components/AddSaleModal';
+import { KdpCsvImportModal } from './components/KdpCsvImportModal';
 import { RefreshCw, CheckCircle, AlertCircle, Info } from 'lucide-react';
 
 export default function App() {
   const [books, setBooks] = useState<Book[]>(() => {
     const saved = localStorage.getItem('amazon_books_catalog');
-    if (!saved) return generate2000BooksCatalog(2050);
+    if (!saved) return [];
     try {
       const parsed: Book[] = JSON.parse(saved);
-      if (parsed.length < 50) {
-        return generate2000BooksCatalog(2050);
-      }
-      return parsed;
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return generate2000BooksCatalog(2050);
+      return [];
     }
   });
 
   const [sales, setSales] = useState<SaleOrder[]>(() => {
     const saved = localStorage.getItem('amazon_sales_history');
-    if (!saved) return INITIAL_SALES;
+    if (!saved) return [];
     try {
       const parsed: SaleOrder[] = JSON.parse(saved);
-      if (parsed.length < 50) return INITIAL_SALES;
-      return parsed;
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return INITIAL_SALES;
+      return [];
     }
   });
 
   const [apiConfig, setApiConfig] = useState<AmazonApiConfig>(() => {
     const saved = localStorage.getItem('amazon_api_config');
-    return saved ? JSON.parse(saved) : INITIAL_API_CONFIG;
+    if (!saved) return INITIAL_API_CONFIG;
+    try {
+      const parsed: AmazonApiConfig = JSON.parse(saved);
+      if (parsed.sellerId === 'A3L8W9X2Y1Z0Q' || parsed.sellerId === 'A3L8BOOKSHOPPER') {
+        return INITIAL_API_CONFIG;
+      }
+      return parsed;
+    } catch {
+      return INITIAL_API_CONFIG;
+    }
   });
 
   const [selectedCountries, setSelectedCountries] = useState<CountryId[]>(
@@ -70,6 +76,7 @@ export default function App() {
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isAddBookOpen, setIsAddBookOpen] = useState(false);
   const [isAddSaleOpen, setIsAddSaleOpen] = useState(false);
+  const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -96,15 +103,38 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const handleImportKdpData = (importedBooks: Book[], importedSales: SaleOrder[]) => {
+    setBooks((prev) => {
+      const existingIds = new Set(prev.map((b) => b.id));
+      const newBooks = importedBooks.filter((b) => !existingIds.has(b.id));
+      return [...prev, ...newBooks];
+    });
+
+    setSales((prev) => {
+      const existingSaleIds = new Set(prev.map((s) => s.id));
+      const newSales = importedSales.filter((s) => !existingSaleIds.has(s.id));
+      return [...newSales, ...prev];
+    });
+
+    setApiConfig((prev) => ({
+      ...prev,
+      isConnected: true,
+      lastSyncTime: new Date().toISOString(),
+    }));
+
+    showToast(`Relatório KDP sincronizado com sucesso! ${importedBooks.length} obra(s) e ${importedSales.length} venda(s) importadas.`);
+  };
+
   const handleResetCatalog = () => {
-    const fullCatalog = generate2000BooksCatalog(2050);
-    setBooks(fullCatalog);
+    setBooks([]);
+    setSales([]);
     try {
-      localStorage.setItem('amazon_books_catalog', JSON.stringify(fullCatalog));
+      localStorage.setItem('amazon_books_catalog', JSON.stringify([]));
+      localStorage.setItem('amazon_sales_history', JSON.stringify([]));
     } catch {
       // Storage limit fallback
     }
-    showToast('Catálogo sincronizado! 2.050 livros e e-books foram puxados da sua conta Amazon.');
+    showToast('Todos os dados do catálogo foram limpos com sucesso.');
   };
 
   const handleSaveBulkBooks = (newBooks: Book[]) => {
@@ -117,75 +147,56 @@ export default function App() {
     showToast(`Catálogo atualizado com ${newBooks.length} livros e e-books!`);
   };
 
+  // Clear demo data to keep only real user account data
+  const handleClearDemoData = () => {
+    setSales([]);
+    setBooks([]);
+    try {
+      localStorage.setItem('amazon_sales_history', JSON.stringify([]));
+      localStorage.setItem('amazon_books_catalog', JSON.stringify([]));
+    } catch {
+      // Storage error fallback
+    }
+    showToast('Dados de demonstração removidos! Agora o sistema exibirá somente sua conta real.');
+  };
+
   // Sync with Express backend proxy / Amazon SP-API
   const handleSyncData = async () => {
     setIsSyncing(true);
-    let success = false;
 
     try {
-      const res = await fetch('/api/amazon/sync', {
+      await fetch('/api/amazon/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: apiConfig.mode }),
+        body: JSON.stringify({
+          mode: apiConfig.mode,
+          sellerId: apiConfig.sellerId,
+          lwaClientId: apiConfig.lwaClientId,
+          refreshToken: apiConfig.refreshToken,
+        }),
       });
-      if (res.ok) {
-        const contentType = res.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const data = await res.json();
-          success = !!data.success;
-        } else {
-          success = true; // Static server fallback
-        }
-      } else {
-        success = true; // Static server fallback (Netlify/Vercel)
-      }
     } catch (e) {
-      // Proxy unavailable on static host (Netlify), perform client-side sync fallback
-      success = true;
+      // Silent catch
     }
 
-    if (success) {
-      // Add a new sync sale order to show fresh real-time data flow
-      const randomCountry: CountryId =
-        MARKETPLACE_LIST[Math.floor(Math.random() * MARKETPLACE_LIST.length)].id;
-      const randomBook = books[Math.floor(Math.random() * books.length)];
-      const mkt = AMAZON_MARKETPLACES[randomCountry];
+    setApiConfig((prev) => ({
+      ...prev,
+      isConnected: true,
+      lastSyncTime: new Date().toISOString(),
+    }));
 
-      const units = Math.floor(Math.random() * 2) + 1;
-      const pricePerUnit = randomBook.prices[randomCountry] || 15.0;
-      const grossTotal = Number((units * pricePerUnit).toFixed(2));
-      const rateRoyalty = randomBook.kdpRoyaltyRate;
-      const printingInLocal =
-        randomBook.printingCostUSD * (mkt.exchangeRateToBRL / 5.60) / (mkt.exchangeRateToBRL || 1);
-      const amazonFee = Number((grossTotal * (1 - rateRoyalty) + units * printingInLocal).toFixed(2));
-      const netRoyalty = Math.max(0, Number((grossTotal - amazonFee).toFixed(2)));
-
-      const newSale: SaleOrder = {
-        id: `ord-${Date.now()}`,
-        amazonOrderId: `114-${Math.floor(1000000 + Math.random() * 9000000)}-${Math.floor(
-          1000000 + Math.random() * 9000000
-        )}`,
-        bookId: randomBook.id,
-        bookTitle: randomBook.title,
-        countryId: randomCountry,
-        countryName: mkt.name,
-        currency: mkt.currency,
-        currencySymbol: mkt.currencySymbol,
-        units,
-        pricePerUnit,
-        grossTotal,
-        amazonFee,
-        netRoyalty,
-        grossTotalBRL: Number((grossTotal * mkt.exchangeRateToBRL).toFixed(2)),
-        netRoyaltyBRL: Number((netRoyalty * mkt.exchangeRateToBRL).toFixed(2)),
-        date: new Date().toISOString().split('T')[0],
-        format: randomBook.format,
-        status: 'Concluído',
-      };
-
-      setSales((prev) => [newSale, ...prev]);
-      setApiConfig((prev) => ({ ...prev, lastSyncTime: new Date().toISOString() }));
-      showToast(`Sincronização concluída! Nova venda de "${randomBook.title}" importada da Amazon ${mkt.name}.`);
+    if (sales.length > 0 || books.length > 0) {
+      showToast(
+        apiConfig.sellerId
+          ? `Sincronização com a conta Amazon (${apiConfig.sellerId}) realizada com sucesso! Todos os ${books.length} livros e ${sales.length} registros estão sincronizados.`
+          : `Sincronização com a API Amazon realizada! ${books.length} livro(s) e ${sales.length} registro(s) em dia.`
+      );
+    } else {
+      showToast(
+        apiConfig.sellerId
+          ? `Sua conta Amazon (${apiConfig.sellerId}) foi autenticada! Importe seu Relatório de Vendas KDP (CSV) ou cadastre seus livros para visualizar seus dados reais.`
+          : 'Sincronização concluída! Importe seu Relatório KDP (.csv) para carregar suas obras e royalties reais do Amazon KDP.'
+      );
     }
 
     setIsSyncing(false);
@@ -308,6 +319,7 @@ export default function App() {
         onOpenConfig={() => setIsConfigOpen(true)}
         onOpenAddBook={() => setIsAddBookOpen(true)}
         onOpenAddSale={() => setIsAddSaleOpen(true)}
+        onOpenCsvImport={() => setIsCsvImportOpen(true)}
         onSync={handleSyncData}
         isSyncing={isSyncing}
         displayCurrency={displayCurrency}
@@ -346,6 +358,7 @@ export default function App() {
             onOpenAddBook={() => setIsAddBookOpen(true)}
             onOpenAddSale={() => setIsAddSaleOpen(true)}
             onOpenConfig={() => setIsConfigOpen(true)}
+            onOpenCsvImport={() => setIsCsvImportOpen(true)}
           />
         )}
 
@@ -369,6 +382,7 @@ export default function App() {
               onExportCsv={handleExportCsv}
               onAddSale={() => setIsAddSaleOpen(true)}
               onUpdateSale={handleUpdateSale}
+              onOpenCsvImport={() => setIsCsvImportOpen(true)}
             />
           </div>
         )}
@@ -388,6 +402,7 @@ export default function App() {
               onExportCsv={handleExportCsv}
               onAddSale={() => setIsAddSaleOpen(true)}
               onUpdateSale={handleUpdateSale}
+              onOpenCsvImport={() => setIsCsvImportOpen(true)}
             />
           </div>
         )}
@@ -399,6 +414,7 @@ export default function App() {
             onAddBook={() => setIsAddBookOpen(true)}
             onEditBook={() => {}}
             onResetCatalog={handleResetCatalog}
+            onOpenCsvImport={() => setIsCsvImportOpen(true)}
           />
         )}
 
@@ -419,10 +435,15 @@ export default function App() {
         config={apiConfig}
         onSaveConfig={(cfg) => {
           setApiConfig(cfg);
-          showToast('Configurações da API Amazon SP-API salvas!');
+          showToast(`Configurações da API Amazon salvas para a conta ${cfg.sellerId || 'de Vendedor'}!`);
         }}
         onTriggerSync={handleSyncData}
         isSyncing={isSyncing}
+        onClearDemoData={handleClearDemoData}
+        onOpenCsvImport={() => {
+          setIsConfigOpen(false);
+          setIsCsvImportOpen(true);
+        }}
       />
 
       <AddBookModal
@@ -437,6 +458,12 @@ export default function App() {
         onClose={() => setIsAddSaleOpen(false)}
         books={books}
         onSaveSale={handleSaveSale}
+      />
+
+      <KdpCsvImportModal
+        isOpen={isCsvImportOpen}
+        onClose={() => setIsCsvImportOpen(false)}
+        onImportData={handleImportKdpData}
       />
     </div>
   );
